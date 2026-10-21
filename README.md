@@ -58,17 +58,23 @@ The security policy: **nothing may enter the LAN**, the LAN may go anywhere, the
 
 pfSense evaluates rules from top to bottom and stops at the first match, so the order of the two DMZ rules matters. My first attempt was a single rule "DMZ net → WAN net", which did not work: Internet addresses are not part of the WAN subnet. The fix was to allow "DMZ net → any" and to place a block rule "DMZ net → LAN net" above it.
 
+![DMZ rules in pfSense: block DMZ net to LAN net first, then allow DMZ net to any](docs/pfsense-dmz-rules.png)
+
 ## What was set up
 
 **pfSense.** LAN interface moved to 192.168.39.1/24 with DHCP, DMZ interface added at 172.16.39.1/24, rules and port forwards above, managed through the web interface from the LAN.
 
-**Web server (DMZ).** Ubuntu Server with a static address, Apache installed with `apt` and managed with `systemctl`, OpenSSH. HTTPS with a self-signed X.509 certificate generated with OpenSSL, enabled with `a2enmod ssl` and `a2ensite default-ssl`.
+**Web server (DMZ).** Ubuntu Server with a static address, Apache installed with `apt` and managed with `systemctl`, OpenSSH. HTTPS with a self-signed X.509 certificate generated with OpenSSL, enabled with `a2enmod ssl` and `a2ensite default-ssl` (steps in [`web-server/https-setup.md`](web-server/https-setup.md)).
 
-**Active Directory (LAN).** New forest and domain `labo.lan`, client joined to the domain, organizational units for computers and users, Group Policies (logon message, no access to Control Panel), shared folders with NTFS permissions by group (students and teachers, full control on their own folder and read-only on the other one), and a logon script deployed by GPO that maps the share as a network drive.
+**Active Directory (LAN).** New forest and domain `labo.lan`, client joined to the domain, organizational units for computers and users, Group Policies (logon message, no access to Control Panel), shared folders with NTFS permissions by group (students and teachers, full control on their own folder and read-only on the other one), and a startup script deployed by GPO that maps the share as a network drive ([`active-directory/map-share.bat`](active-directory/map-share.bat)).
 
-**DNS.** Forwarder to 8.8.8.8 for external names, an A record `www.labo.lan` pointing to the web server, and a reverse lookup zone (`39.16.172.in-addr.arpa`) with a PTR record, tested with `nslookup`.
+**DNS.** Forwarder to 8.8.8.8 for external names, an A record `www.labo.lan` pointing to the web server, and a reverse lookup zone (`39.16.172.in-addr.arpa`) with a PTR record, tested with `nslookup`:
+
+![Reverse lookup of 172.16.39.11 returns www.labo.lan](docs/dns-reverse-lookup.png)
 
 **Site-to-site VPN.** IPsec tunnel between the two pfSense firewalls. Phase 1 (IKE) authenticates both sides with a pre-shared key and uses Diffie-Hellman to agree on a shared secret; phase 2 defines the encryption and the two subnets (192.168.39.0/24 and 192.168.20.0/24). Tested with a ping between the two LANs.
+
+![IPsec tunnel established between the two pfSense firewalls (IKEv2, AES, SHA-256)](docs/ipsec-status.png)
 
 **Backups.** Described below; the scripts are in the [`backup/`](backup/) folder.
 
@@ -111,3 +117,6 @@ The script also now exits with tar's exit code, so cron or a monitoring tool can
 - [`backup/backup.sh`](backup/backup.sh): backup script (Ubuntu web server)
 - [`backup/crontab.txt`](backup/crontab.txt): cron schedule
 - [`backup/fetch-latest-backup.ps1`](backup/fetch-latest-backup.ps1): retrieval script (Windows Server)
+- [`web-server/https-setup.md`](web-server/https-setup.md): self-signed certificate and Apache HTTPS configuration
+- [`active-directory/map-share.bat`](active-directory/map-share.bat): startup script mapping the shared folder
+- [`docs/`](docs/): screenshots from the lab report
